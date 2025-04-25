@@ -15,6 +15,21 @@ interface CreateRoomProps {
   onRoomCreated: (roomId: string) => void
 }
 
+// Define a type for custom events
+interface RoomCreatedEvent extends CustomEvent {
+  detail: {
+    room?: {
+      id?: string;
+    };
+  };
+}
+
+interface RoomErrorEvent extends CustomEvent {
+  detail: {
+    error?: string;
+  };
+}
+
 export default function CreateRoom({ onBack, onRoomCreated }: CreateRoomProps) {
   const { playerName, setPlayerName, createRoom, isConnected, connect } = useMultiplayer()
   const [name, setName] = useState(playerName)
@@ -29,107 +44,102 @@ export default function CreateRoom({ onBack, onRoomCreated }: CreateRoomProps) {
   useEffect(() => {
     if (!isConnected) {
       connect().catch(err => {
-        console.error("Failed to connect to multiplayer service:", err)
-        setError("Failed to connect to multiplayer service. Please try again.")
-      })
+        console.error("Failed to connect to multiplayer service:", err);
+        setError("Failed to connect to multiplayer service. Please try again.");
+      });
     }
-  }, [isConnected, connect])
+  }, [isConnected, connect]);
 
   // Custom event listeners for room creation success/failure
   useEffect(() => {
-    // Create custom event handlers
-    const handleCreateSuccess = (e: CustomEvent) => {
-      console.log("Room created successfully:", e.detail)
-      const newRoomId = e.detail?.room?.id || roomId
-      setRoomId(newRoomId)
-      setWaiting(true)
+    // Create the event handler functions
+    const handleCreateSuccess = (event: Event) => {
+      const e = event as RoomCreatedEvent;
+      console.log("Room created successfully:", e.detail);
+      const newRoomId = e.detail?.room?.id || roomId;
+      setRoomId(newRoomId);
+      setCreating(false);
+      setWaiting(true);
       
       // In a real implementation, you would wait for a connection before proceeding
       // For now, we'll simulate proceeding to the room after a short delay
       setTimeout(() => {
-        onRoomCreated(newRoomId)
-      }, 1500)
-    }
+        onRoomCreated(newRoomId);
+      }, 1500);
+    };
 
-    const handleCreateError = (e: CustomEvent) => {
-      console.error("Failed to create room:", e.detail)
-      setCreating(false)
-      setError(e.detail?.error || "Failed to create room. Please try again.")
-    }
-
-    // Type assertion for CustomEvent
-    const successHandler = (e: Event) => handleCreateSuccess(e as CustomEvent)
-    const errorHandler = (e: Event) => handleCreateError(e as CustomEvent)
+    const handleCreateError = (event: Event) => {
+      const e = event as RoomErrorEvent;
+      console.error("Failed to create room:", e.detail);
+      setCreating(false);
+      setError(e.detail?.error || "Failed to create room. Please try again.");
+    };
 
     // Add event listeners
-    window.addEventListener("room_created", successHandler)
-    window.addEventListener("create_room_error", errorHandler)
+    window.addEventListener("room_created", handleCreateSuccess);
+    window.addEventListener("create_room_error", handleCreateError);
+
+    // Set a timeout for error handling in case no event is received
+    const timeout = setTimeout(() => {
+      if (creating && !roomId) {
+        setCreating(false);
+        setError("Timed out while creating room. Please try again.");
+      }
+    }, 10000);
 
     // Cleanup
     return () => {
-      window.removeEventListener("room_created", successHandler)
-      window.removeEventListener("create_room_error", errorHandler)
-    }
-  }, [roomId, onRoomCreated])
+      window.removeEventListener("room_created", handleCreateSuccess);
+      window.removeEventListener("create_room_error", handleCreateError);
+      clearTimeout(timeout);
+    };
+  }, [roomId, onRoomCreated, creating]);
 
   const handleCreateRoom = () => {
-    playSound("button-click.mp3")
+    playSound("button-click.mp3");
     
     // Validate input
     if (!name.trim()) {
-      setError("Please enter your name")
-      return
+      setError("Please enter your name");
+      return;
     }
     
-    setCreating(true)
-    setError(null)
+    setCreating(true);
+    setError(null);
     
     // Update player name if changed
     if (name !== playerName) {
-      setPlayerName(name)
+      setPlayerName(name);
     }
     
     // Create a new room with custom name if provided
     try {
-      const roomOptions = {
-        name: roomName.trim() || `${name}'s Room`
-      }
-      const newRoomId = createRoom(roomOptions.name)
+      const newRoomId = createRoom(roomName.trim() || `${name}'s Room`);
       
       // Store the room ID for reference
       if (newRoomId) {
-        setRoomId(newRoomId)
+        setRoomId(newRoomId);
       }
-    } catch (error) {
-      console.error("Failed to create room:", error)
-      setError("Failed to create room. Please try again.")
-      setCreating(false)
+    } catch (error: any) {
+      console.error("Failed to create room:", error);
+      setError(error.message || "Failed to create room. Please try again.");
+      setCreating(false);
     }
-    
-    // Set a timeout for error handling
-    const timeout = setTimeout(() => {
-      if (creating && !roomId) {
-        setCreating(false)
-        setError("Timed out while creating room. Please try again.")
-      }
-    }, 5000)
-    
-    return () => clearTimeout(timeout)
-  }
+  };
 
   const handleCopyRoomId = () => {
-    playSound("button-click.mp3")
-    navigator.clipboard.writeText(roomId)
-    setCopied(true)
+    playSound("button-click.mp3");
+    navigator.clipboard.writeText(roomId);
+    setCopied(true);
     
     // Reset the copied state after 2 seconds
-    setTimeout(() => setCopied(false), 2000)
-  }
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const handleBack = () => {
-    playSound("button-click.mp3")
-    onBack()
-  }
+    playSound("button-click.mp3");
+    onBack();
+  };
 
   return (
     <div
@@ -275,6 +285,13 @@ export default function CreateRoom({ onBack, onRoomCreated }: CreateRoomProps) {
 
 
 
+
+
+
+
+
+
+
 // "use client"
 
 // import { useState, useEffect } from "react"
@@ -284,6 +301,8 @@ export default function CreateRoom({ onBack, onRoomCreated }: CreateRoomProps) {
 // import { motion } from "framer-motion"
 // import { useMultiplayer } from "./multiplayer-context-provider"
 // import { playSound } from "@/lib/sound-utils"
+// import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+// import { AlertCircle } from "lucide-react"
 
 // interface CreateRoomProps {
 //   onBack: () => void
@@ -291,35 +310,105 @@ export default function CreateRoom({ onBack, onRoomCreated }: CreateRoomProps) {
 // }
 
 // export default function CreateRoom({ onBack, onRoomCreated }: CreateRoomProps) {
-//   const { playerName, setPlayerName, createRoom } = useMultiplayer()
+//   const { playerName, setPlayerName, createRoom, isConnected, connect } = useMultiplayer()
 //   const [name, setName] = useState(playerName)
+//   const [roomName, setRoomName] = useState("")
 //   const [roomId, setRoomId] = useState("")
 //   const [copied, setCopied] = useState(false)
+//   const [creating, setCreating] = useState(false)
 //   const [waiting, setWaiting] = useState(false)
+//   const [error, setError] = useState<string | null>(null)
 
+//   // Make sure the connection is established
 //   useEffect(() => {
-//     if (roomId) {
-//       setWaiting(true)
+//     if (!isConnected) {
+//       connect().catch(err => {
+//         console.error("Failed to connect to multiplayer service:", err)
+//         setError("Failed to connect to multiplayer service. Please try again.")
+//       })
 //     }
-//   }, [roomId])
+//   }, [isConnected, connect])
+
+//   // Custom event listeners for room creation success/failure
+//   useEffect(() => {
+//     // Create custom event handlers
+//     const handleCreateSuccess = (e: CustomEvent) => {
+//       console.log("Room created successfully:", e.detail)
+//       const newRoomId = e.detail?.room?.id || roomId
+//       setRoomId(newRoomId)
+//       setWaiting(true)
+      
+//       // In a real implementation, you would wait for a connection before proceeding
+//       // For now, we'll simulate proceeding to the room after a short delay
+//       setTimeout(() => {
+//         onRoomCreated(newRoomId)
+//       }, 1500)
+//     }
+
+//     const handleCreateError = (e: CustomEvent) => {
+//       console.error("Failed to create room:", e.detail)
+//       setCreating(false)
+//       setError(e.detail?.error || "Failed to create room. Please try again.")
+//     }
+
+//     // Type assertion for CustomEvent
+//     const successHandler = (e: Event) => handleCreateSuccess(e as CustomEvent)
+//     const errorHandler = (e: Event) => handleCreateError(e as CustomEvent)
+
+//     // Add event listeners
+//     window.addEventListener("room_created", successHandler)
+//     window.addEventListener("create_room_error", errorHandler)
+
+//     // Cleanup
+//     return () => {
+//       window.removeEventListener("room_created", successHandler)
+//       window.removeEventListener("create_room_error", errorHandler)
+//     }
+//   }, [roomId, onRoomCreated])
 
 //   const handleCreateRoom = () => {
 //     playSound("button-click.mp3")
+    
+//     // Validate input
+//     if (!name.trim()) {
+//       setError("Please enter your name")
+//       return
+//     }
+    
+//     setCreating(true)
+//     setError(null)
     
 //     // Update player name if changed
 //     if (name !== playerName) {
 //       setPlayerName(name)
 //     }
     
-//     // Create a new room
-//     const newRoomId = createRoom()
-//     setRoomId(newRoomId)
+//     // Create a new room with custom name if provided
+//     try {
+//       const roomOptions = {
+//         name: roomName.trim() || `${name}'s Room`
+//       }
+//       const newRoomId = createRoom(roomOptions.name)
+      
+//       // Store the room ID for reference
+//       if (newRoomId) {
+//         setRoomId(newRoomId)
+//       }
+//     } catch (error) {
+//       console.error("Failed to create room:", error)
+//       setError("Failed to create room. Please try again.")
+//       setCreating(false)
+//     }
     
-//     // In a real implementation, you would wait for a connection before proceeding
-//     // For now, we'll simulate proceeding to the room after a short delay
-//     setTimeout(() => {
-//       onRoomCreated(newRoomId)
-//     }, 2000)
+//     // Set a timeout for error handling
+//     const timeout = setTimeout(() => {
+//       if (creating && !roomId) {
+//         setCreating(false)
+//         setError("Timed out while creating room. Please try again.")
+//       }
+//     }, 5000)
+    
+//     return () => clearTimeout(timeout)
 //   }
 
 //   const handleCopyRoomId = () => {
@@ -366,6 +455,14 @@ export default function CreateRoom({ onBack, onRoomCreated }: CreateRoomProps) {
 //       >
 //         {!roomId ? (
 //           <div className="space-y-6">
+//             {error && (
+//               <Alert variant="destructive" className="mb-4">
+//                 <AlertCircle className="h-4 w-4" />
+//                 <AlertTitle>Error</AlertTitle>
+//                 <AlertDescription>{error}</AlertDescription>
+//               </Alert>
+//             )}
+            
 //             <div className="space-y-2">
 //               <label className="text-sm font-medium text-gray-200">Your Display Name</label>
 //               <Input 
@@ -374,15 +471,35 @@ export default function CreateRoom({ onBack, onRoomCreated }: CreateRoomProps) {
 //                 onChange={(e) => setName(e.target.value)}
 //                 className="bg-gray-800 border-gray-700 text-white"
 //                 placeholder="Enter your name"
+//                 disabled={creating}
+//               />
+//             </div>
+            
+//             <div className="space-y-2">
+//               <label className="text-sm font-medium text-gray-200">Room Name (Optional)</label>
+//               <Input 
+//                 type="text" 
+//                 value={roomName}
+//                 onChange={(e) => setRoomName(e.target.value)}
+//                 className="bg-gray-800 border-gray-700 text-white"
+//                 placeholder="Enter room name or leave blank for default"
+//                 disabled={creating}
 //               />
 //             </div>
             
 //             <Button
 //               onClick={handleCreateRoom}
-//               disabled={!name.trim()}
+//               disabled={!name.trim() || creating}
 //               className="w-full bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-700 hover:to-amber-700 text-black font-bold py-3"
 //             >
-//               Create Battle Room
+//               {creating ? (
+//                 <>
+//                   <div className="w-4 h-4 rounded-full border-2 border-t-black border-r-transparent border-b-transparent border-l-transparent animate-spin mr-2"></div>
+//                   Creating...
+//                 </>
+//               ) : (
+//                 "Create Battle Room"
+//               )}
 //             </Button>
 //           </div>
 //         ) : (
@@ -436,6 +553,7 @@ export default function CreateRoom({ onBack, onRoomCreated }: CreateRoomProps) {
 //           <Button
 //             onClick={handleBack}
 //             className="bg-gray-800/90 hover:bg-gray-700/90 text-white px-6 py-2 rounded-full"
+//             disabled={creating}
 //           >
 //             <ArrowLeft className="mr-2 h-5 w-5" />
 //             Back
@@ -445,3 +563,7 @@ export default function CreateRoom({ onBack, onRoomCreated }: CreateRoomProps) {
 //     </div>
 //   )
 // }
+
+
+
+

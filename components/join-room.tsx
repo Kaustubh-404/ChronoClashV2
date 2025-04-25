@@ -20,7 +20,6 @@ export default function JoinRoom({ onBack, onRoomJoined }: JoinRoomProps) {
   const { playerName, setPlayerName, availableRooms, joinRoom, isConnected, connect } = useMultiplayer()
   const [name, setName] = useState(playerName)
   const [roomCode, setRoomCode] = useState("")
-  const [copied, setCopied] = useState(false)
   const [joining, setJoining] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [viewingRooms, setViewingRooms] = useState(false)
@@ -31,129 +30,136 @@ export default function JoinRoom({ onBack, onRoomJoined }: JoinRoomProps) {
     setError(null)
   }, [roomCode])
 
-  // Custom event listeners for room joining success/failure
+  // Set up event listeners for room joining success/failure
   useEffect(() => {
-    // Create custom event handlers
-    const handleJoinSuccess = () => {
-      console.log("Room join success event received")
-      setJoining(false)
-      onRoomJoined(roomCode)
-    }
+    const handleJoinSuccess = (e: Event) => {
+      console.log("Room join success event received");
+      setJoining(false);
+      onRoomJoined(roomCode);
+    };
 
     const handleJoinError = (e: CustomEvent) => {
-      console.log("Room join error event received:", e.detail)
-      setJoining(false)
-      setError(e.detail?.error || "Failed to join room")
-    }
-
-    // Type assertion for CustomEvent
-    const successHandler = (e: Event) => handleJoinSuccess()
-    const errorHandler = (e: Event) => handleJoinError(e as CustomEvent)
+      console.log("Room join error event received:", e.detail);
+      setJoining(false);
+      setError(e.detail?.error || "Failed to join room");
+    };
 
     // Add event listeners
-    window.addEventListener("room_joined", successHandler)
-    window.addEventListener("join_room_error", errorHandler)
+    window.addEventListener("room_joined", handleJoinSuccess);
+    window.addEventListener("join_room_error", handleJoinError as EventListener);
 
     // Cleanup
     return () => {
-      window.removeEventListener("room_joined", successHandler)
-      window.removeEventListener("join_room_error", errorHandler)
-    }
-  }, [roomCode, onRoomJoined])
+      window.removeEventListener("room_joined", handleJoinSuccess);
+      window.removeEventListener("join_room_error", handleJoinError as EventListener);
+    };
+  }, [roomCode, onRoomJoined]);
 
   const handleRefreshRooms = async () => {
     try {
-      setRefreshingRooms(true)
+      setRefreshingRooms(true);
       
       // Reconnect to refresh the room list
       if (!isConnected) {
-        await connect()
+        await connect();
       }
       
-      playSound("button-click.mp3")
+      playSound("button-click.mp3");
       
       // Simulate delay for UX feedback
       setTimeout(() => {
-        setRefreshingRooms(false)
-      }, 1000)
+        setRefreshingRooms(false);
+      }, 1000);
     } catch (error) {
-      console.error("Failed to refresh rooms:", error)
-      setRefreshingRooms(false)
+      console.error("Failed to refresh rooms:", error);
+      setRefreshingRooms(false);
     }
-  }
+  };
 
   const handleJoinRoom = () => {
-    playSound("button-click.mp3")
+    playSound("button-click.mp3");
     
-    // Update player name if changed
-    if (name !== playerName) {
-      setPlayerName(name)
+    // Validate input
+    if (!name.trim()) {
+      setError("Please enter your name");
+      return;
     }
     
     if (!roomCode.trim()) {
-      setError("Please enter a room code")
-      return
+      setError("Please enter a room code");
+      return;
     }
-    
-    setJoining(true)
-    setError(null)
-    
-    console.log("Attempting to join room:", roomCode.trim())
-    
-    // Attempt to join the room
-    joinRoom(roomCode.trim())
-    
-    // Set a timeout to clear joining state if no success/error event received
-    const timeout = setTimeout(() => {
-      if (joining) {
-        setJoining(false)
-        setError("Timed out waiting for server response")
-      }
-    }, 5000)
-    
-    return () => clearTimeout(timeout)
-  }
-
-  const handleJoinSpecificRoom = (roomId: string) => {
-    playSound("button-click.mp3")
     
     // Update player name if changed
     if (name !== playerName) {
-      setPlayerName(name)
+      setPlayerName(name);
     }
     
-    setJoining(true)
-    setError(null)
-    setRoomCode(roomId)
+    setJoining(true);
+    setError(null);
     
-    console.log("Attempting to join specific room:", roomId)
+    console.log("Attempting to join room:", roomCode.trim());
     
     // Attempt to join the room
-    joinRoom(roomId)
+    joinRoom(roomCode.trim());
     
-    // Set a timeout to clear joining state if no success/error event received
+    // Set a timeout to handle cases where no event is received
     const timeout = setTimeout(() => {
       if (joining) {
-        setJoining(false)
-        setError("Timed out waiting for server response")
+        setJoining(false);
+        setError("Timed out waiting for server response. Please try again.");
       }
-    }, 5000)
+    }, 10000);
     
-    return () => clearTimeout(timeout)
-  }
+    return () => clearTimeout(timeout);
+  };
+
+  const handleJoinSpecificRoom = (roomId: string) => {
+    playSound("button-click.mp3");
+    
+    // Validate input
+    if (!name.trim()) {
+      setError("Please enter your name");
+      return;
+    }
+    
+    // Update player name if changed
+    if (name !== playerName) {
+      setPlayerName(name);
+    }
+    
+    setJoining(true);
+    setError(null);
+    setRoomCode(roomId);
+    
+    console.log("Attempting to join specific room:", roomId);
+    
+    // Attempt to join the room
+    joinRoom(roomId);
+    
+    // Set a timeout to handle cases where no event is received
+    const timeout = setTimeout(() => {
+      if (joining) {
+        setJoining(false);
+        setError("Timed out waiting for server response. Please try again.");
+      }
+    }, 10000);
+    
+    return () => clearTimeout(timeout);
+  };
 
   const handleBack = () => {
-    playSound("button-click.mp3")
-    onBack()
-  }
+    playSound("button-click.mp3");
+    onBack();
+  };
 
   const toggleViewRooms = () => {
-    playSound("button-click.mp3")
-    setViewingRooms(!viewingRooms)
+    playSound("button-click.mp3");
+    setViewingRooms(!viewingRooms);
     if (!viewingRooms) {
-      handleRefreshRooms()
+      handleRefreshRooms();
     }
-  }
+  };
 
   return (
     <div
@@ -217,7 +223,7 @@ export default function JoinRoom({ onBack, onRoomJoined }: JoinRoomProps) {
             
             <Button
               onClick={handleJoinRoom}
-              disabled={!name.trim()}
+              disabled={!name.trim() || !roomCode.trim()}
               className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white py-3"
             >
               <LogIn className="mr-2 h-5 w-5" />
@@ -324,22 +330,18 @@ export default function JoinRoom({ onBack, onRoomJoined }: JoinRoomProps) {
 
 
 
-
-
-
 // "use client"
 
 // import { useState, useEffect } from "react"
 // import { Button } from "@/components/ui/button"
 // import { Input } from "@/components/ui/input"
-// import { ArrowLeft, LogIn, Search, RefreshCw } from "lucide-react"
+// import { ArrowLeft, Copy, Users, RefreshCw, LogIn, Search } from "lucide-react"
 // import { motion } from "framer-motion"
 // import { useMultiplayer } from "./multiplayer-context-provider"
 // import { playSound } from "@/lib/sound-utils"
 // import { Card, CardContent } from "@/components/ui/card"
 // import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 // import { AlertCircle } from "lucide-react"
-// // Import RoomData type
 
 // interface JoinRoomProps {
 //   onBack: () => void
@@ -350,47 +352,67 @@ export default function JoinRoom({ onBack, onRoomJoined }: JoinRoomProps) {
 //   const { playerName, setPlayerName, availableRooms, joinRoom, isConnected, connect } = useMultiplayer()
 //   const [name, setName] = useState(playerName)
 //   const [roomCode, setRoomCode] = useState("")
+//   const [copied, setCopied] = useState(false)
 //   const [joining, setJoining] = useState(false)
-//   const [error, setError] = useState("")
+//   const [error, setError] = useState<string | null>(null)
 //   const [viewingRooms, setViewingRooms] = useState(false)
 //   const [refreshingRooms, setRefreshingRooms] = useState(false)
 
 //   // Reset errors when the room code changes
 //   useEffect(() => {
-//     setError("")
+//     setError(null)
 //   }, [roomCode])
 
-//   // Listen for room join errors
+//   // Custom event listeners for room joining success/failure
 //   useEffect(() => {
-//     const handleJoinError = (data: { error: string }) => {
-//       console.log("Join room error received:", data.error);
-//       setJoining(false);
-//       setError(data.error || "Failed to join room");
-//     };
+//     // Create custom event handlers
+//     const handleJoinSuccess = () => {
+//       console.log("Room join success event received")
+//       setJoining(false)
+//       onRoomJoined(roomCode)
+//     }
 
-//     // Add the event listener
-//     window.addEventListener("join_room_error", (e: any) => handleJoinError(e.detail));
+//     const handleJoinError = (e: CustomEvent) => {
+//       console.log("Room join error event received:", e.detail)
+//       setJoining(false)
+//       setError(e.detail?.error || "Failed to join room")
+//     }
 
-//     // Clean up
+//     // Type assertion for CustomEvent
+//     const successHandler = (e: Event) => handleJoinSuccess()
+//     const errorHandler = (e: Event) => handleJoinError(e as CustomEvent)
+
+//     // Add event listeners
+//     window.addEventListener("room_joined", successHandler)
+//     window.addEventListener("join_room_error", errorHandler)
+
+//     // Cleanup
 //     return () => {
-//       window.removeEventListener("join_room_error", (e: any) => handleJoinError(e.detail));
-//     };
-//   }, []);
+//       window.removeEventListener("room_joined", successHandler)
+//       window.removeEventListener("join_room_error", errorHandler)
+//     }
+//   }, [roomCode, onRoomJoined])
 
 //   const handleRefreshRooms = async () => {
 //     try {
-//       setRefreshingRooms(true);
+//       setRefreshingRooms(true)
+      
 //       // Reconnect to refresh the room list
 //       if (!isConnected) {
-//         await connect();
+//         await connect()
 //       }
-//       playSound("button-click.mp3");
+      
+//       playSound("button-click.mp3")
+      
+//       // Simulate delay for UX feedback
+//       setTimeout(() => {
+//         setRefreshingRooms(false)
+//       }, 1000)
 //     } catch (error) {
-//       console.error("Failed to refresh rooms:", error);
-//     } finally {
-//       setTimeout(() => setRefreshingRooms(false), 1000);
+//       console.error("Failed to refresh rooms:", error)
+//       setRefreshingRooms(false)
 //     }
-//   };
+//   }
 
 //   const handleJoinRoom = () => {
 //     playSound("button-click.mp3")
@@ -406,9 +428,9 @@ export default function JoinRoom({ onBack, onRoomJoined }: JoinRoomProps) {
 //     }
     
 //     setJoining(true)
-//     setError("")
+//     setError(null)
     
-//     console.log("Attempting to join room:", roomCode.trim());
+//     console.log("Attempting to join room:", roomCode.trim())
     
 //     // Attempt to join the room
 //     joinRoom(roomCode.trim())
@@ -421,14 +443,7 @@ export default function JoinRoom({ onBack, onRoomJoined }: JoinRoomProps) {
 //       }
 //     }, 5000)
     
-//     // Set up one-time listener for success
-//     const handleRoomJoinedSuccess = () => {
-//       clearTimeout(timeout)
-//       setJoining(false)
-//       onRoomJoined(roomCode.trim())
-//     }
-    
-//     window.addEventListener("room_joined", handleRoomJoinedSuccess, { once: true })
+//     return () => clearTimeout(timeout)
 //   }
 
 //   const handleJoinSpecificRoom = (roomId: string) => {
@@ -440,10 +455,10 @@ export default function JoinRoom({ onBack, onRoomJoined }: JoinRoomProps) {
 //     }
     
 //     setJoining(true)
-//     setError("")
+//     setError(null)
 //     setRoomCode(roomId)
     
-//     console.log("Attempting to join specific room:", roomId);
+//     console.log("Attempting to join specific room:", roomId)
     
 //     // Attempt to join the room
 //     joinRoom(roomId)
@@ -456,14 +471,7 @@ export default function JoinRoom({ onBack, onRoomJoined }: JoinRoomProps) {
 //       }
 //     }, 5000)
     
-//     // Set up one-time listener for success
-//     const handleRoomJoinedSuccess = () => {
-//       clearTimeout(timeout)
-//       setJoining(false)
-//       onRoomJoined(roomId)
-//     }
-    
-//     window.addEventListener("room_joined", handleRoomJoinedSuccess, { once: true })
+//     return () => clearTimeout(timeout)
 //   }
 
 //   const handleBack = () => {
@@ -475,7 +483,7 @@ export default function JoinRoom({ onBack, onRoomJoined }: JoinRoomProps) {
 //     playSound("button-click.mp3")
 //     setViewingRooms(!viewingRooms)
 //     if (!viewingRooms) {
-//       handleRefreshRooms();
+//       handleRefreshRooms()
 //     }
 //   }
 
@@ -583,13 +591,13 @@ export default function JoinRoom({ onBack, onRoomJoined }: JoinRoomProps) {
                 
 //                 {availableRooms.length > 0 ? (
 //                   availableRooms
-//                     .filter(room => room.status === "waiting" && room.players.length < ((room as any).maxPlayers || 2))
+//                     .filter(room => room.status === "waiting" && room.players.length < (room.maxPlayers || 2))
 //                     .map(room => (
 //                       <Card key={room.id} className="bg-gray-800 border-gray-700">
 //                         <CardContent className="p-4">
 //                           <div className="flex justify-between items-center">
 //                             <div>
-//                               <h3 className="font-bold text-yellow-400">{room.name || ((room as any).hostName ? `${(room as any).hostName}'s Room` : `Room ${room.id}`)}</h3>
+//                               <h3 className="font-bold text-yellow-400">{room.name || (room.hostName ? `${room.hostName}'s Room` : `Room ${room.id}`)}</h3>
 //                               <p className="text-xs text-gray-400">Room Code: {room.id}</p>
 //                             </div>
 //                             <Button 
@@ -640,8 +648,4 @@ export default function JoinRoom({ onBack, onRoomJoined }: JoinRoomProps) {
 //     </div>
 //   )
 // }
-
-
-
-
 
